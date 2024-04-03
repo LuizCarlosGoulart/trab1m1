@@ -1,118 +1,65 @@
-import numpy as np
 import cv2
-from scipy.ndimage import convolve
+import numpy as np
 import matplotlib.pyplot as plt
-from skimage import metrics
 
-# Função para adicionar ruído gaussiano (usando numpy)
-def add_gaussian_noise(image, mean=0, var=0.1):
-    row, col = image.shape
-    sigma = var**0.5
-    gauss = np.random.normal(mean, sigma, (row, col))
-    noisy_image = image + gauss
-    noisy_image = np.clip(noisy_image, 0, 255)  # Limita os valores entre 0 e 255
-    return noisy_image.astype(np.uint8)
+def image_grayscale(image_path):
+    image = cv2.imread(image_path)
+    return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-# Operações pontuais implementadas manualmente
-def adjust_brightness(image, brightness):
-    # Assegura que a operação é realizada dentro dos limites de 0 e 255
-    return np.clip(image + brightness, 0, 255).astype(np.uint8)
+def median_filter(image, kernel_size):
+    pad_size = kernel_size // 2
+    padded_image = np.pad(image, pad_size, mode='constant', constant_values=0)
+    filtered_image = np.zeros_like(image)
+    
+    for i in range(image.shape[0]):
+        for j in range(image.shape[1]):
+            region = padded_image[i:i+kernel_size, j:j+kernel_size]
+            filtered_image[i, j] = np.median(region)
+    return filtered_image.astype(np.uint8)
 
-def adjust_contrast(image, contrast):
-    # Fator de ajuste de contraste
-    f = (259 * (contrast + 255)) / (255.0 * (259 - contrast))
-    # Aplica o ajuste de contraste
-    contrast_adjusted = f * (image - 118) + 128
-    return np.clip(contrast_adjusted, 0, 255).astype(np.uint8)
+def plot_comparison(original_image, filtered_image, filter_title):
+    fig, axs = plt.subplots(2, 2, figsize=(16, 12))
 
-def invert_image(image):
-    return 255 - image
+    axs[0, 0].imshow(original_image, cmap='gray')
+    axs[0, 0].set_title('Imagem Original')
+    axs[0, 0].axis('off')
+    
+    axs[0, 1].hist(original_image.ravel(), bins=256, color='black')
+    axs[0, 1].set_title('Histograma Original')
+    axs[0, 1].set_xlim([0, 256])
 
-# Funções de filtros espaciais usando convolve do scipy
-def apply_average_filter(image):
-    kernel = np.ones((3, 3)) / 9
-    return convolve(image, kernel, mode='reflect').astype(np.uint8)
-
-def apply_gaussian_filter(image, sigma=1.0):
-    kernel = np.array([[1, 2, 1], [2, 4, 2], [1, 2, 1]]) / 16
-    return convolve(image, kernel, mode='reflect').astype(np.uint8)
-
-def apply_median_filter(image):
-    # Implementação manual do filtro mediano seria ineficiente sem numpy/scipy,
-    # mas aqui usamos cv2 por simplicidade e foco nas operações pontuais.
-    return cv2.medianBlur(image, 3)
-
-# Carregar e converter a imagem para escala de cinza usando OpenCV
-image_path = 'lena.jpg'  # Assegure-se de ter essa imagem ou substitua pelo caminho correto
-image = cv2.imread(image_path)
-gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-# Adicionar ruído
-noisy_image = add_gaussian_noise(gray_image)
-
-# Aplicar operações pontuais
-bright_image = adjust_brightness(noisy_image, 30)
-contrast_image = adjust_contrast(noisy_image, 50)
-inverted_image = invert_image(noisy_image)
-
-# Aplicar filtros de remoção de ruído
-average_filtered = apply_average_filter(bright_image)
-gaussian_filtered = apply_gaussian_filter(contrast_image)
-median_filtered = apply_median_filter(inverted_image)
-
-# A partir daqui, você pode usar o matplotlib para exibir as imagens e os histogramas,
-# e calcular métricas como MSE e SSIM para avaliar as diferenças.
-def plot_image_and_its_histogram(image, title, position):
-    # Define o subplot para a imagem
-    plt.subplot(2, 2, position)
-    plt.imshow(image, cmap='gray')
-    plt.title(title)
-    plt.axis('off')
-
-    # Define o subplot para o histograma da imagem
-    plt.subplot(2, 2, position + 2)
-    plt.hist(image.ravel(), bins=256, color='black')
-    plt.title('Histograma')
-    plt.xlim([0, 256])
-
-def plot_original_and_selected_image_with_histograms(selected_image, selected_title):
-    plt.figure(figsize=(12, 12))
-
-    # Plotar a imagem original e seu histograma
-    plot_image_and_its_histogram(gray_image, 'Original', 1)
-
-    # Plotar a imagem selecionada e seu histograma
-    plot_image_and_its_histogram(selected_image, selected_title, 2)
+    axs[1, 0].imshow(filtered_image, cmap='gray')
+    axs[1, 0].set_title(f'Imagem com Filtro - {filter_title}')
+    axs[1, 0].axis('off')
+    
+    axs[1, 1].hist(filtered_image.ravel(), bins=256, color='black')
+    axs[1, 1].set_title(f'Histograma - {filter_title}')
+    axs[1, 1].set_xlim([0, 256])
 
     plt.tight_layout()
     plt.show()
 
-# Solicitar ao usuário que selecione a imagem para visualização
-print("Selecione a imagem para visualização:")
-print("1 - Original")
-print("2 - Com Ruído")
-print("3 - Brilho Ajustado")
-print("4 - Contraste Ajustado")
-print("5 - Imagem Invertida")
-print("6 - Filtro Média")
-print("7 - Filtro Gaussiano")
-print("8 - Filtro Mediana")
-escolha = input("Digite o número da imagem: ")
+# Imagem em escala de cinza
+gray_image = image_grayscale('lena.jpg')
 
-# Dicionário para mapear a escolha para a função correspondente
-imagens = {
-    '1': (gray_image, 'Original'),
-    '2': (noisy_image, 'Com Ruído'),
-    '3': (bright_image, 'Brilho Ajustado'),
-    '4': (contrast_image, 'Contraste Ajustado'),
-    '5': (inverted_image, 'Imagem Invertida'),
-    '6': (average_filtered, 'Filtro Média'),
-    '7': (gaussian_filtered, 'Filtro Gaussiano'),
-    '8': (median_filtered, 'Filtro Mediana'),
+# Aplica os filtros
+filtered_median = median_filter(gray_image, 3)
+
+filters = {
+    '1': ('Mediana', filtered_median),
+    '0': ('Sair', None)
 }
 
-# Obter a imagem e o título baseado na escolha do usuário
-selected_image, selected_title = imagens.get(escolha, (gray_image, 'Original'))
+while True:
+    print("\nEscolha o filtro de ruído:")
+    print("1 - Filtro Mediana")
+    print("0 - Sair")
+    choice = input("Digite sua escolha: ")
 
-# Exibir a imagem original e a imagem selecionada, junto com seus histogramas
-plot_original_and_selected_image_with_histograms(selected_image, selected_title)
+    if choice == '0':
+        break
+    elif choice in filters:
+        title, image = filters[choice]
+        plot_comparison(gray_image, image, title)
+    else:
+        print("Escolha inválida. Por favor, tente novamente.")
